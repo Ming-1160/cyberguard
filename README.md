@@ -11,6 +11,18 @@ from the same content.
 No framework, no build step, no libraries, no network requests.
 
 
+## Live site
+
+https://ming-1160.github.io/cyberguard/
+
+GitHub Pages publishes the site from the `gh-pages` branch. `main` holds the same
+files. To update the site, push the same commit to both branches:
+
+```bash
+git push origin main main:gh-pages
+```
+
+
 ## Version 3 (11 Nov 2026) — what changed
 
 Only the Routes page (the matching activity) changed. `data.js` and `index.html` are
