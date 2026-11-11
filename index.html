@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CyberGuard — Malware Mission / 惡意軟件任務</title>
+<meta name="description" content="A bilingual (EN / 繁體中文) classroom web app for the S4 ICT lesson Network Security Risks: Malware. All scenarios are simulated — no real malware is hosted or linked.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#060d22">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='11' fill='%2336e2ff'/%3E%3Cpath d='M11 4.6 16.4 6.9v4.3c0 3.2-2.2 5.3-5.4 6.2-3.2-.9-5.4-3-5.4-6.2V6.9z' fill='none' stroke='%2304122b' stroke-width='1.8'/%3E%3C/svg%3E">
+</head>
+<body data-view="home">
+
+<!-- the bowl glow (home page only), drawn into a 96x60 canvas and stretched by CSS -->
+<div class="atmo" aria-hidden="true"><canvas id="bg" width="96" height="60"></canvas></div>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#/" aria-label="CyberGuard — home">
+    <svg class="mark" width="26" height="26" viewBox="0 0 22 22" aria-hidden="true" focusable="false">
+      <circle cx="11" cy="11" r="11" fill="#36e2ff"/>
+      <path d="M11 4.6 16.4 6.9v4.3c0 3.2-2.2 5.3-5.4 6.2-3.2-.9-5.4-3-5.4-6.2V6.9z"
+            fill="none" stroke="#04122b" stroke-width="1.8" stroke-linejoin="round"/>
+    </svg>
+    <span class="brandname">CyberGuard</span>
+  </a>
+
+  <nav class="links" id="navlinks" aria-label="Main">
+    <a href="#/learn" data-nav="learn"><span class="en">Learn</span><span class="zh">學習</span></a>
+    <a href="#/quiz" data-nav="quiz"><span class="en">Quiz</span><span class="zh">測驗</span></a>
+    <a href="#/cases" data-nav="cases"><span class="en">Case files</span><span class="zh">個案</span></a>
+    <a href="#/teacher" data-nav="teacher"><span class="en">Teacher</span><span class="zh">教師</span></a>
+  </nav>
+
+  <div class="navright">
+    <button class="langbtn" id="langbtn" type="button" aria-label="Switch language / 切換語言">
+      <span class="langopt" data-for="en">EN</span>
+      <span class="langopt" data-for="zh">繁</span>
+    </button>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<noscript>
+  <div class="noscript">
+    <strong>This site needs JavaScript.</strong> Please enable it, or use the printed pack in folder A of the lesson plan.<br>
+    本網站需要 JavaScript。請開啟它，或使用教案資料夾 A 的印刷包。
+  </div>
+</noscript>
+
+<script>window.addEventListener("error",function(e){var m=document.getElementById("app");if(m)m.textContent="ERROR: "+e.message+" @ "+(e.filename||"").split("/").pop()+":"+e.lineno+":"+e.colno;});</script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
