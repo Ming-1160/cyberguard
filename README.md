@@ -1,7 +1,10 @@
 # CyberGuard — 惡意軟件任務 / Malware Mission
 
 A bilingual (English / 繁體中文) classroom web app for the S4 ICT lesson
-**Network Security Risks: Malware** (70 minutes, 32 students, 16 tablets).
+**Network Security Risks: Malware** (70 minutes, 32 students, one tablet each).
+
+> Sections below "Version 3" describe earlier versions of the site. Where they differ from
+> the Version 4 notes, the Version 4 notes are the current ones.
 
 It is the educational digital tool and the digital student worksheet described in
 `INT2065_Malware_Website_Outline.docx` — the same six picture items, the same four
@@ -21,6 +24,54 @@ files. To update the site, push the same commit to both branches:
 ```bash
 git push origin main main:gh-pages
 ```
+
+
+## Version 4 (11 Nov 2026) — what changed
+
+The lesson now uses three tools, each for one job:
+
+| Tool | Who uses it | What it is for |
+|---|---|---|
+| Teaching slides | Teacher, on the projector | Hook, six types, Table 5.1, four routes, the four cases |
+| **This website** | Each student, on a tablet | **Tests only** |
+| Worksheet | Groups, on paper | Case study and peer check |
+
+So the student side of the site is now short and runs in one fixed order:
+
+1. **Part 1 · Quiz** — 10 questions. Every question has an animated picture.
+2. **Part 2 · Match the routes** — 4 pictures. Checked once, then locked.
+3. **Part 3 · Exit question** — one new case (Tina, from the class worksheet). Two types of
+   malware fit, so both are accepted. The route is marked too. The two written answers are
+   for the teacher.
+4. **My results** — one card with the three scores and the two written answers. The student
+   types a class number, takes a screenshot and posts it on the class Padlet. The homework
+   (the group's own sheet, 16 marks) is shown under the card.
+
+**Simple on purpose**
+- The start page is one list of the four parts and one button.
+- Every part begins with "what to do" in three short steps.
+- A part opens only when the part before it is finished. A locked part shows a padlock.
+  Typing a locked address sends the student back to the part they are on.
+- No minutes are shown on student pages.
+- The wording is for one tablet per student ("Submit", not "We agree").
+- In the quiz, the clues are one tidy list (a to g) instead of loose chips.
+- While a question is on screen its picture is not redrawn, so the animation does not start
+  again at every tap.
+
+**Teacher code**
+- Entering the teacher code opens every part on that device, and keeps it open after a
+  reload. Tap *Lock* before a student uses the device.
+- The earlier teaching pages (Hook, Six types, Case files) and the print pack are still in
+  the site, but only open with the teacher code. They are linked from the teacher area.
+- The teacher area has the answer keys for all three parts.
+
+**Files** — there are now five files to deploy: `index.html`, `style.css`, `data.js`,
+`scenes.js` (new: the ten quiz pictures) and `app.js`.
+
+**Checked / not checked**
+- Checked in Chromium: the whole flow, the locks, the scores, reload in the middle of each
+  part, the teacher code, *Clear all data*, English and Chinese, landscape and portrait.
+- Not checked on a real iPad (Safari).
 
 
 ## Version 3 (11 Nov 2026) — what changed
@@ -105,7 +156,7 @@ python3 -m http.server 8000
 # open http://<your-laptop-ip>:8000 on the tablets
 ```
 
-Deploy by copying the four files to any static host (GitHub Pages, Netlify,
+Deploy by copying the five files to any static host (GitHub Pages, Netlify,
 university web space). There is nothing to compile.
 
 ---

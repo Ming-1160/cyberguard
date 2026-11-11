@@ -307,6 +307,31 @@ crossref: [
   ['63–70','Exit slip / 離堂小測','#/exit','Slide 7']
 ],
 
+/* ---------------------------------------------------------------- v4: Part 3, the exit question
+   The case is E2 on the class worksheet. Two types fit, so both are accepted. */
+exit: {
+  text: ['Tina downloads a free homework-helper browser add-on from an unfamiliar website. It works as normal, but it secretly collects what she types. A week later, someone logs in to her school email with her password.',
+         'Tina 從一個不熟悉的網站下載了一個免費的「功課助手」瀏覽器附加元件。它運作正常，但暗中收集她輸入的內容。一星期後，有人用她的密碼登入了她的學校電郵。'],
+  q1: ['What type of malware could this be? Choose <b>all</b> the possible answers.', '這可能是哪一種惡意軟件？選出<b>所有</b>可能的答案。'],
+  types: ['spyware', 'trojan'],
+  why1: ['Two answers fit. Spyware: it secretly collects what she types. Trojan program: it looks like a useful add-on and works as normal, but it lets someone else get her data.',
+         '有兩個答案合理。間諜軟件：它暗中收集她輸入的內容。木馬程式：它看似有用而且運作正常，卻讓其他人取得她的資料。'],
+  q2: ['How did it get into her computer?', '它是經哪個途徑進入她的電腦？'],
+  route: 'free',
+  why2: ['Freeware and shareware: she downloaded a free add-on from an unfamiliar website.', '免費軟件及共享軟件：她從不熟悉的網站下載了免費的附加元件。'],
+  q3: ['Write <b>two</b> different problems this could cause for Tina. Use the word “because”.', '寫出這件事可能為 Tina 帶來的<b>兩個</b>不同問題，並用「因為」。'],
+  model: ['Someone can read or send her emails without permission, because they have her password. Her other accounts could be stolen too, because the add-on records everything she types.',
+          '其他人可以未經許可閱讀或發送她的電郵，因為他們有她的密碼。她的其他帳戶也可能被盜，因為附加元件會記錄她輸入的所有內容。']
+},
+
+/* v4: the homework is the group's own sheet, handed out on paper (16 marks) */
+homework2: {
+  text: ['Finish the homework sheet your teacher gives you (16 marks). Hand it in on paper.', '完成老師派發的家課工作紙（共 16 分），以紙本提交。'],
+  parts: [['Part A: match the six types of malware (6 marks)', '甲部：配對六種惡意軟件（6 分）'],
+          ['Part B: one multiple-choice question (1 mark)', '乙部：一條選擇題（1 分）'],
+          ['Part C: two cases, Peter and Tom (9 marks)', '丙部：兩個個案，Peter 和 Tom（9 分）']]
+},
+
 homework: [
   { ref:['Chapter Exercise Q3 (p. 118)','課本練習第 3 題（第 118 頁）'],
     ask:['Copy the exact question wording from the textbook, then use this structure.',

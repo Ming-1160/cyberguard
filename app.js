@@ -16,6 +16,9 @@ var ST = {
   hook: { before: null, after: null },
   quiz: {}, checkpoint: {},
   routesPick: {}, routesCons: {},   /* v3: listed here so the Routes answers survive a page reload */
+  routesDone: false, routesScore: 0,                 /* v4: Part 2 is checked once, then locked */
+  tina: { types: [], route: null, p1: '', p2: '', done: false, score: 0, s1: 0, s2: 0 },   /* v4: Part 3 */
+  classNo: '', unlocked: false,                      /* v4: results page; the teacher code stays on after a reload */
   cases: {}, exit: null, tally: {}
 };
 try {
@@ -107,10 +110,13 @@ var SCENE_ALT = {
           '動畫：有人在走廊地上拾起一個 USB 快閃記憶體，並插入手提電腦，畫面顯示「USB 已連接」。']
 };
 function scene(id) {
-  var f = SCENE[id];
-  if (!f) return '';
-  return '<div class="scene sc-' + id + '" role="img" aria-label="' + esc(L(SCENE_ALT[id])).replace(/"/g, '&quot;') + '">' +
-    '<svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><g class="root">' + f() + '</g></svg></div>';
+  /* the four Routes scenes live in this file; the quiz pictures come from scenes.js */
+  var f = SCENE[id], lib = window.SCENES, inner, alt, box = '0 0 320 160';
+  if (f) { inner = f(); alt = L(SCENE_ALT[id]); }
+  else if (lib && lib.has(id)) { inner = lib.svg(id, lang); alt = lib.alt(id, lang); box = lib.box(id); }
+  else return '';
+  return '<div class="scene sc-' + id + '" role="img" aria-label="' + esc(alt).replace(/"/g, '&quot;') + '">' +
+    '<svg viewBox="' + box + '" preserveAspectRatio="xMidYMid ' + (f ? 'slice' : 'meet') + '" aria-hidden="true" focusable="false"><g class="root">' + inner + '</g></svg></div>';
 }
 var CUR = '<path d="M0 0v13l3.4-3.1 2.3 5.2 2.2-1-2.3-5.1h4.6z" fill="#fff" stroke="#04122b" stroke-width=".9" stroke-linejoin="round"/>';
 var SCENE = {
@@ -494,63 +500,106 @@ function stageBar(active) {
   '</nav>';
 }
 
-/* ------------------------------------------------------------------ home */
-function viewHome() {
-  /* the six "agents" the class will learn to recognise, each in its own colour */
-  var cells = D.types.map(function (t, i) {
-    return '<a class="cell" href="#/learn"' + tcStyle(t.id) + '>' +
-      '<span class="cicon">' + icon(t.id) + '</span>' +
-      '<span class="cname"><span class="num">0' + (i + 1) + '</span>' + esc(t.name[0]) + '<span class="czh">' + esc(t.name[1]) + '</span></span></a>';
-  }).join('');
-  var stats = [['70', T('minutes', '分鐘')], ['6', T('types', '種類型')], ['4', T('routes', '種途徑')], ['0', T('real malware', '真實惡意軟件')]]
-    .map(function (s) { return '<span><b>' + s[0] + '</b> ' + s[1] + '</span>'; }).join('');
+/* ------------------------------------------------------------------ v4: the student flow
+   Students see three short tests and a results page, in this order. A part opens only
+   when the part before it is finished. The teacher code opens everything on that device.
+   The teaching itself (hook, six types, routes, cases) is done with the teaching slides. */
+var PARTS = [
+  { id: 'quiz',    t: ['Quiz', '測驗'],                 sub: ['10 questions', '10 題'] },
+  { id: 'routes',  t: ['Match the routes', '途徑配對'],  sub: ['4 pictures', '4 幅圖'] },
+  { id: 'exit',    t: ['Exit question', '離堂小測'],     sub: ['1 new case', '1 個新個案'] },
+  { id: 'results', t: ['My results', '我的成績'],        sub: ['Screenshot for Padlet', '截圖貼到 Padlet'] }
+];
+var TEACHER_ONLY = { hook: 1, learn: 1, cases: 1, print: 1 };
+function partIndex(id) { for (var i = 0; i < PARTS.length; i++) if (PARTS[i].id === id) return i; return -1; }
+function partDone(id) {
+  if (id === 'quiz') return firstUnlocked() >= quizOrder().length;
+  if (id === 'routes') return !!ST.routesDone;
+  if (id === 'exit') return !!(ST.tina && ST.tina.done);
+  return false;
+}
+function partOpen(id) {
+  var i = partIndex(id);
+  if (i < 0 || ST.unlocked) return true;
+  for (var j = 0; j < i; j++) if (!partDone(PARTS[j].id)) return false;
+  return true;
+}
+function nextPart() {            /* the first part that is not finished yet */
+  for (var i = 0; i < PARTS.length - 1; i++) if (!partDone(PARTS[i].id)) return PARTS[i].id;
+  return 'results';
+}
+function partScore(id) {
+  if (id === 'quiz') return quizScore() + ' / ' + quizOrder().length;
+  if (id === 'routes') return ST.routesScore + ' / ' + D.evidence.length;
+  if (id === 'exit') return ST.tina.score + ' / 3';
+  return '';
+}
+function escAttr(s) { return esc(s == null ? '' : s).replace(/"/g, '&quot;'); }
+var LOCK_ICON = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
-  return '<section class="view" id="v-home" data-view="home">' +
-    '<div class="hero">' +
-      '<p class="kicker fade-up" style="--d:.5s">' + icon('shield') + T('Mission briefing · S4 ICT · C2 Section 5.1', '任務簡報 · 中四 ICT · 必修 C2 第 5.1 節') + '</p>' +
-      '<h1 id="h1" aria-label="' + esc(T('Learn the six kinds of malware before they reach you', '認識六種惡意軟件，在它們找上你之前')) + '"></h1>' +
-      '<p class="trust fade-up" style="--d:1.0s">' + T('Spot the clue. Name the malware. Stop the attack.', '找出線索，說出類型，阻止攻擊。') + '</p>' +
-      '<div class="ctas fade-up" style="--d:1.15s">' +
-        '<a class="btn lg cta" href="#/hook">' + T('Start the mission', '開始任務') + ARROW + '</a>' +
-        '<a class="btn ghost lg" href="#/learn">' + T('Meet the six types', '認識六種類型') + '</a></div>' +
-      '<div class="logos fade-up" style="--d:1.3s" aria-label="' + esc(T('The six types of malware', '六種惡意軟件')) + '">' + cells + '</div>' +
-      '<p class="herostats fade-up" style="--d:1.45s">' + stats + '</p>' +
-    '</div>' +
-    '<section class="statement"><div class="pin"><p id="stmt" aria-label="' +
-      esc(T('This site is a simulation. No real malware, anywhere. No names, no e-mails. Nothing leaves this device.',
-            '本網站是模擬。沒有真實惡意軟件。不收姓名、不收電郵。資料不離開裝置。')) + '"></p></div></section>' +
-    '<section class="split">' +
-      '<div class="l"><div class="guide"></div>' +
-        '<h2 id="h2" aria-label="' + esc(T('Six types. Four routes. Two consequences.', '六種類型。四種途徑。兩項後果。')) + '"></h2>' +
-        '<div class="row" id="row"><div><h3>' + T('Mission map', '任務地圖') + '</h3>' +
-          '<p>' + T('<b>Every type is practised, not just named.</b> Ten auto-marked items, then four case files: the type, the evidence, the route and the harm.',
-            '<b>每種類型都要練習，而不只是命名。</b>先做十道自動批改題目，再分析四份個案：類型、證據、途徑與損害。') + '</p></div>' +
-          '<ol class="mlist">' + STAGES.map(function (s, i) {
-            return '<li><a href="' + s[2] + '"><span class="mn">0' + (i + 1) + '</span><span class="mtx">' + esc(T(s[0], s[1])) + '</span>' +
-              '<span class="mm">' + s[3] + T(' min', ' 分鐘') + '</span></a></li>';
-          }).join('') + '</ol>' +
-        '</div>' +
-      '</div>' +
-      '<div class="r" aria-hidden="true">' + netviz() + '</div>' +
-    '</section>' +
-  '</section>';
+/* the strip of parts: a tick for finished, a padlock for locked */
+function partStrip(id) {
+  var here = partIndex(id);
+  return PARTS.map(function (p, i) {
+    var done = partDone(p.id), open = partOpen(p.id);
+    var cls = i === here ? 'now' : done ? 'done' : open ? 'open' : 'lock';
+    var mark = done && i !== here ? icon('check') : !open ? LOCK_ICON : (i + 1);
+    var inner = '<span class="pn">' + mark + '</span><span class="pt">' + esc(L(p.t)) + '</span>';
+    return '<li class="' + cls + '">' + (open
+      ? '<a href="#/' + p.id + '"' + (i === here ? ' aria-current="step"' : '') + '>' + inner + '</a>'
+      : '<span class="pl" aria-label="' + escAttr(L(p.t) + T(' (locked)', '（未解鎖）')) + '">' + inner + '</span>') + '</li>';
+  }).join('');
+}
+/* the top of every part: where am I, and what do I do here */
+function partBar(id, todo) {
+  var here = partIndex(id);
+  return '<nav class="parts" aria-label="' + escAttr(T('Parts', '部分')) + '"><ol>' + partStrip(id) + '</ol></nav>' +
+    '<div class="todo"><div class="todohead"><span class="tag">' +
+      (here < 3 ? T('Part ' + (here + 1) + ' of 3', '第 ' + (here + 1) + ' 部分（共 3 部分）') : T('Finish', '完成')) + '</span>' +
+      '<h1>' + esc(L(PARTS[here].t)) + '</h1></div>' +
+      '<ol class="todolist">' + todo.map(function (s) { return '<li><span>' + s + '</span></li>'; }).join('') + '</ol></div>';
+}
+/* refresh the strip after an answer, without drawing the page again */
+function syncParts() {
+  var ol = app.querySelector('nav.parts ol');
+  if (ol && partIndex(current) >= 0) ol.innerHTML = partStrip(current);
+}
+var toastTimer = null;
+function toast(msg) {
+  var el = document.getElementById('toast');
+  if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'cgtoast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.classList.remove('show'); }, 3200);
 }
 
-function netviz() {
-  var nodes = [[90,120],[200,80],[320,140],[400,240],[300,300],[180,260],[80,340],[210,420],[340,400],[420,500],[300,560],[170,600]];
-  var edges = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[1,5],[2,4],[4,7],[8,10],[0,6]];
-  var s = '<svg viewBox="0 0 480 700" preserveAspectRatio="xMidYMid slice" class="netviz">';
-  edges.forEach(function (e) {
-    s += '<line class="e" x1="' + nodes[e[0]][0] + '" y1="' + nodes[e[0]][1] + '" x2="' + nodes[e[1]][0] + '" y2="' + nodes[e[1]][1] + '"/>';
-  });
-  nodes.forEach(function (n) { s += '<circle class="n" cx="' + n[0] + '" cy="' + n[1] + '" r="7"/>'; });
-  [[1,0],[4,1.1],[7,2.2],[10,3.3]].forEach(function (h) {
-    s += '<circle class="hot" cx="' + nodes[h[0]][0] + '" cy="' + nodes[h[0]][1] + '" r="6" style="animation-delay:' + h[1] + 's"/>';
-  });
-  [[1,4],[4,7],[7,10]].forEach(function (h) {
-    s += '<line class="hotpath" x1="' + nodes[h[0]][0] + '" y1="' + nodes[h[0]][1] + '" x2="' + nodes[h[1]][0] + '" y2="' + nodes[h[1]][1] + '" style="animation-delay:' + (h[1] / 3) + 's"/>';
-  });
-  return s + '</svg>';
+/* ------------------------------------------------------------------ home */
+/* v4: one short page. It lists the parts and has one button: start, or carry on. */
+function viewHome() {
+  var np = nextPart();
+  var rows = PARTS.map(function (p, i) {
+    var done = partDone(p.id), open = partOpen(p.id), isNext = p.id === np;
+    var cls = done ? 'done' : isNext ? 'now' : open ? 'open' : 'lock';
+    var stat = done ? icon('check') + T('Done', '已完成') + ' · ' + partScore(p.id)
+      : !open ? LOCK_ICON + T('Locked', '未解鎖')
+      : isNext ? T('Start here', '由這裏開始') : T('Open', '可進入');
+    var body = '<span class="pn">' + (i + 1) + '</span><span class="hp"><b>' + esc(L(p.t)) + '</b><span>' + esc(L(p.sub)) + '</span></span>' +
+      '<span class="hs">' + stat + '</span>';
+    return '<li class="' + cls + '">' + (open ? '<a href="#/' + p.id + '">' + body + '</a>' : '<span class="pl">' + body + '</span>') + '</li>';
+  }).join('');
+  var started = quizOrder().some(function (st) { var q = qState(st); return q.locked || q.tries > 0 || q.pick; });
+  var label = np === 'results' ? T('See my results', '查看我的成績')
+    : (started ? T('Continue: ', '繼續：') : T('Start: ', '開始：')) + L(PARTS[partIndex(np)].t);
+  return '<section class="view" id="v-home" data-view="home"><div class="page narrow">' +
+    '<div class="homehead"><h1>' + T('Malware tests', '惡意軟件小測') + '</h1>' +
+      '<p class="lede">' + T('Do the parts in order. A part opens when you finish the one before it.',
+        '請按次序完成。完成一部分後，下一部分才會開啟。') + '</p></div>' +
+    '<ol class="homeparts">' + rows + '</ol>' +
+    '<div class="rowline" style="margin-top:22px"><a class="btn lg" href="#/' + np + '">' + esc(label) + ARROW + '</a></div>' +
+    '<p class="tiny muted" style="margin-top:28px">' + T('This site is a simulation. Nothing on it is real malware, and nothing leaves this device.',
+      '本網站是模擬，沒有真實惡意軟件，資料亦不會離開本裝置。') + '</p>' +
+    '<p class="tiny" style="margin-top:8px"><a class="quiet" href="#/teacher">' + T('Teacher', '教師') + '</a> · <a class="quiet" href="#/about">' + T('About', '關於') + '</a></p>' +
+  '</div></section>';
 }
 
 /* ------------------------------------------------------------------ hook */
@@ -783,7 +832,7 @@ function viewLearn() {
     '</div></section>';
 }
 
-/* ------------------------------------------------------------------ quiz */
+/* ------------------------------------------------------------------ quiz (Part 1) */
 var QUIZ_ORDER = null;
 function quizOrder() {
   if (!QUIZ_ORDER) {
@@ -792,7 +841,7 @@ function quizOrder() {
   }
   return QUIZ_ORDER;
 }
-function qKey(step) { return step.kind === 'item' ? step.data.id : step.data.id; }
+function qKey(step) { return step.data.id; }
 function qState(step) {
   var k = qKey(step);
   var bag = step.kind === 'item' ? ST.quiz : ST.checkpoint;
@@ -813,11 +862,11 @@ function quizScore() {
 
 function viewQuiz() {
   return '<section class="view" id="v-quiz"><div class="page">' +
-    stageBar(2) +
-    '<div class="pagehead"><div class="eyebrow">' + T('Activity 1 · 19–31 min', '活動一 · 19–31 分鐘') + '</div>' +
-      '<h1>' + T('Malware quiz', '惡意軟件測驗') + '</h1>' +
-      '<p class="lede">' + T('Six pictures, then four questions from the textbook. Agree with your partner before you answer — you can change your answer once.',
-        '六幅圖片，然後是四道教科書題目。作答前先與同伴取得共識 —— 你有一次更改答案的機會。') + '</p></div>' +
+    partBar('quiz', [
+      T('Watch the picture and read the question.', '看動畫，讀題目。'),
+      T('Choose your answer. For questions 1 to 6, choose the clue too.', '選擇答案。第 1 至 6 題還要選出線索。'),
+      T('Tap <b>Submit</b>. You have two tries for each question.', '按<b>提交</b>。每題有兩次機會。')
+    ]) +
     '<div id="qhost"></div></div></section>';
 }
 
@@ -825,12 +874,12 @@ function renderQuiz() {
   var host = document.getElementById('qhost'); if (!host) return;
   var order = quizOrder();
   if (quizPos === null) quizPos = firstUnlocked();
-  if (quizPos >= order.length) return renderQuizDone(host);
+  if (quizPos >= order.length) { host.removeAttribute('data-q'); renderQuizDone(host); syncParts(); return; }
 
   var idx = quizPos;
   var step = order[idx], st = qState(step), d = step.data, isItem = step.kind === 'item';
   var answered = order.filter(function (s) { return qState(s).locked; }).length;
-  var remaining = order.filter(function (s) { return !qState(s).locked; }).length;
+  var remaining = order.length - answered;
   var dots = order.map(function (s, i) {
     var q = qState(s), cls = q.ok ? 'done' : q.locked ? 'miss' : i === idx ? 'now' : '';
     return '<i class="' + cls + '"></i>';
@@ -838,7 +887,7 @@ function renderQuiz() {
   var rightAnswer = isItem ? d.answer : d.key;
   var okChips = isItem ? chipList(d.chip) : [];
 
-  /* once an item is locked, the right answer turns green and a wrong pick turns red */
+  /* once a question is locked, the right answer turns green and a wrong pick turns red */
   var mark = function (id) {
     if (!st.locked) return st.pick === id ? ' sel' : '';
     return id === rightAnswer ? ' ok' : st.pick === id ? ' bad' : '';
@@ -857,10 +906,12 @@ function renderQuiz() {
     if (!st.locked) return st.chip === id ? ' sel' : '';
     return okChips.indexOf(id) >= 0 ? (st.chip === id || !st.ok ? ' ok' : '') : st.chip === id ? ' bad' : '';
   };
-  var chips = isItem ? '<div class="chipsrow"><div class="lbl">' + T('Which clue told you? Pick one.', '哪一條線索告訴你？請選一項。') + '</div><div class="chips">' +
-    D.chips.map(function (c) {
-      return '<button class="chip' + chipMark(c.id) + '" data-act="chip" data-v="' + c.id + '"' + (st.locked ? ' disabled' : '') + '>' + esc(L(c.t)) + '</button>';
-    }).join('') + '</div></div>' : '';
+  /* v4: the clues are one tidy list, each with a letter, instead of loose chips */
+  var chips = isItem ? '<div class="qstep"><span class="qsn">2</span>' + T('Which clue told you?', '哪一條線索告訴你？') + '</div><div class="cluelist">' +
+    D.chips.map(function (c, i) {
+      return '<button class="clue' + chipMark(c.id) + '" data-act="chip" data-v="' + c.id + '"' + (st.locked ? ' disabled' : '') + '>' +
+        '<span class="cl">' + 'abcdefg'.charAt(i) + '</span><span class="ct">' + esc(L(c.t)) + '</span></button>';
+    }).join('') + '</div>' : '';
 
   var fb = '';
   if (st.locked) {
@@ -870,39 +921,51 @@ function renderQuiz() {
       chipName = okChips.map(function (id) {
         var cc = D.chips.filter(function (c) { return c.id === id; })[0];
         return cc ? L(cc.t) : '';
-      }).join(T(' / ', ' / '));
+      }).join(' / ');
     }
     fb = '<div class="fb show ' + (good ? 'ok' : 'no') + '">' +
       (good ? '<span class="plus" aria-hidden="true">+1 ' + icon('star') + '</span>' : '') +
-      '<b>' + (good ? T('Yes! Star earned.', '正確！獲得一粒星。') : T('Not this one.', '不是這一項。')) + '</b> ' +
+      '<b>' + (good ? T('Correct!', '正確！') : T('Not this one.', '不是這一項。')) + '</b> ' +
       (isItem ? T('The clue is: ', '線索是：') + '<b>' + esc(chipName) + '</b>. ' : '') + esc(L(d.why)) + '</div>';
   } else if (st.tries > 0) {
-    fb = '<div class="fb show hint">' + T('Not yet — look at the one feature that only this type has. You can try once more.',
-      '還未對 —— 看清楚只有這一種才有的特徵。你可以再試一次。') + '</div>';
+    fb = '<div class="fb show hint">' + T('Not yet. Look for the one feature that only this type has. You can try once more.',
+      '還未對。找出只有這一種才有的特徵。你可以再試一次。') + '</div>';
   }
 
   var canSubmit = st.pick && (!isItem || st.chip);
-  var pct = Math.round((answered / order.length) * 100);
-  host.innerHTML =
-    '<div class="qhead">' +
-      '<div class="qprog"><div class="ql"><span>' + T('Mission progress', '任務進度') + '</span><span>' + answered + ' / ' + order.length + '</span></div>' +
-        '<div class="dots" role="img" aria-label="' + esc(T(answered + ' of ' + order.length + ' answered', '已答 ' + answered + ' / ' + order.length)) + '">' + dots + '</div></div>' +
-      '<div class="stars" aria-label="' + esc(T('Stars: ' + quizScore(), '星星：' + quizScore())) + '">' + icon('star') + '<b>' + quizScore() + '</b><span>/ ' + order.length + '</span></div>' +
-    '</div>' +
-    '<div class="qcard card' + (lastResult === 'no' ? ' shake' : '') + '"><div class="art">' +
-      (isItem ? art(d.art, d.alt) : '<div class="cpbadge">' + icon('shield') + '<b>' + d.id + '</b><span>Checkpoint</span></div>') + '</div>' +
-      '<div class="body"><div class="qid">' + (isItem ? T('Picture item', '圖片題') + ' ' + d.id : T('Textbook Checkpoint', '課本 Checkpoint') + ' ' + d.id) +
-        '<span class="qcount">' + (idx + 1) + ' / ' + order.length + '</span></div>' +
-        '<p class="sit">' + esc(isItem ? L(d.sit) : L(d.q)) + '</p>' +
-        '<div class="answers' + (isItem ? ' types' : '') + '">' + answers + '</div>' + chips + fb +
-        '<div class="qfoot">' +
-          (st.locked
-            ? '<button class="btn" data-act="next">' + (remaining === 0 ? T('See your score', '查看得分') : T('Next', '下一題')) + ARROW + '</button>'
-            : '<button class="btn" data-act="submit"' + (canSubmit ? '' : ' disabled') + '>' + T('We agree', '我們同意') + ARROW + '</button>') +
-          '<span class="muted small">' + T('Discuss with your partner before you submit.', '提交前請先與同伴討論。') + '</span>' +
-        '</div></div></div>' +
-    '<div class="rowline" style="margin-top:18px"><a class="btn ghost sm" href="#/teacher">' + T('Teacher view', '教師檢視') + '</a>' +
-      '<button class="btn ghost sm" data-act="resetQuiz">' + T('Reset this device', '重設本裝置') + '</button></div>';
+  var head = '<div class="qprog"><div class="ql"><span>' + T('Answered', '已答') + '</span><span>' + answered + ' / ' + order.length + '</span></div>' +
+      '<div class="dots" role="img" aria-label="' + escAttr(T(answered + ' of ' + order.length + ' answered', '已答 ' + answered + ' / ' + order.length)) + '">' + dots + '</div></div>' +
+    '<div class="stars" aria-label="' + escAttr(T('Stars: ' + quizScore(), '星星：' + quizScore())) + '">' + icon('star') + '<b>' + quizScore() + '</b><span>/ ' + order.length + '</span></div>';
+  var body = '<div class="qid">' + T('Question ' + (idx + 1) + ' of ' + order.length, '第 ' + (idx + 1) + ' 題（共 ' + order.length + ' 題）') + '</div>' +
+    '<p class="sit">' + esc(isItem ? L(d.sit) : L(d.q)) + '</p>' +
+    (isItem ? '<div class="qstep"><span class="qsn">1</span>' + T('What type of malware is it?', '這是哪一種惡意軟件？') + '</div>' : '') +
+    '<div class="answers' + (isItem ? ' types' : '') + '">' + answers + '</div>' + chips + fb +
+    '<div class="qfoot">' +
+      (st.locked
+        ? '<button class="btn" data-act="next">' + (remaining === 0 ? T('See my score', '查看得分') : T('Next question', '下一題')) + ARROW + '</button>'
+        : '<button class="btn" data-act="submit"' + (canSubmit ? '' : ' disabled') + '>' + T('Submit', '提交') + ARROW + '</button>') +
+    '</div>';
+
+  /* remember which button had the focus, so keyboard users keep their place */
+  var af = document.activeElement, fa = af && af.getAttribute ? af.getAttribute('data-act') : null, fv = fa ? af.getAttribute('data-v') : null;
+
+  /* v4: while the same question is on screen, only the text side is drawn again.
+     The picture is left alone, so its animation does not start again at every tap. */
+  if (host.getAttribute('data-q') === d.id && host.querySelector('.qcard .body')) {
+    host.querySelector('.qhead').innerHTML = head;
+    host.querySelector('.qcard .body').innerHTML = body;
+  } else {
+    host.setAttribute('data-q', d.id);
+    host.innerHTML = '<div class="qhead">' + head + '</div>' +
+      '<div class="qcard card"><div class="art">' + scene('q' + d.id) + '</div><div class="body">' + body + '</div></div>';
+  }
+  var cardEl = host.querySelector('.qcard');
+  cardEl.classList.remove('shake');
+  if (lastResult === 'no') { void cardEl.offsetWidth; cardEl.classList.add('shake'); }
+  if (fa && host.contains && !host.contains(document.activeElement)) {
+    var nb = host.querySelector('[data-act="' + fa + '"]' + (fv ? '[data-v="' + fv + '"]' : ''));
+    if (nb && !nb.disabled) { try { nb.focus({ preventScroll: true }); } catch (e) { nb.focus(); } }
+  }
 
   if (justSubmitted) {
     justSubmitted = false;
@@ -944,72 +1007,59 @@ function starBurst(el) {
   setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 1200);
 }
 
-function quizRank(score) {
-  if (score >= 9) return T('Rank: Cyber Guard Master', '級別：網絡守衞大師');
-  if (score >= 6) return T('Rank: Cyber Guard', '級別：網絡守衞');
-  return T('Rank: Guard in training', '級別：見習守衞');
-}
-
 function renderQuizDone(host) {
   var score = quizScore(), order = quizOrder();
-  var missed = order.filter(function (s) { return !qState(s).ok; }).map(function (s) { return s.data.id; });
+  var missed = [];
+  order.forEach(function (s, i) { if (!qState(s).ok) missed.push(i + 1); });
   var starRow = order.map(function (s, i) {
     return '<i class="' + (i < score ? 'on' : '') + '" style="--i:' + i + '">' + icon('star') + '</i>';
   }).join('');
   host.innerHTML = '<div class="card done-card">' +
-    '<div class="donetag">' + icon('shield') + T('Mission complete', '任務完成') + '</div>' +
+    '<div class="donetag">' + icon('shield') + T('Part 1 finished', '第 1 部分完成') + '</div>' +
     '<div class="starrow" aria-hidden="true">' + starRow + '</div>' +
     '<div class="big">' + score + '<span class="of"> / ' + order.length + '</span></div>' +
-    '<div class="rank">' + quizRank(score) + '</div>' +
-    '<p class="body" style="margin-top:16px">' + T('This is the evidence your teacher uses. Next: how malware spreads — then you apply it all to a case file.',
-      '這就是教師用來判斷你理解的證據。下一步：認識惡意軟件的傳播途徑，然後把所學應用在個案上。') + '</p>' +
-    (missed.length ? '<div class="missed card pad"><h3 class="sub">' + T('Re-read these before the case files', '看個案前請重讀這幾項') + '</h3>' +
-      '<p class="small muted">' + T('Items you did not get right: ', '未答對的題目：') + missed.join(', ') + '</p></div>' : '') +
-    '<div class="rowline" style="justify-content:center;margin-top:26px">' +
-      '<a class="btn" href="#/routes">' + T('Next: how it spreads', '下一步：傳播途徑') + ARROW + '</a>' +
-      '<button class="btn ghost" data-act="resetQuiz">' + T('Start again', '重新開始') + '</button></div></div>';
+    (missed.length ? '<p class="small muted" style="margin-top:14px">' + T('Questions to look at again: ', '要重溫的題目：') + missed.join(', ') + '</p>' : '') +
+    '<p class="waitmsg">' + T('Wait for your teacher before you start Part 2.', '請等老師指示，才開始第 2 部分。') + '</p>' +
+    '<div class="rowline" style="justify-content:center;margin-top:20px">' +
+      '<a class="btn" href="#/routes">' + T('Start Part 2: Match the routes', '開始第 2 部分：途徑配對') + ARROW + '</a></div></div>';
 }
 
-/* ------------------------------------------------------------------ routes */
+/* ------------------------------------------------------------------ routes (Part 2) */
+/* v4: this page is a test now. The four routes are taught with the teaching slides, so the
+   page shows only the four pictures. The answers are checked once, then locked. */
+function routeCard(e) {
+  var sel = (ST.routesPick && ST.routesPick[e.id]) || null, done = !!ST.routesDone, right = sel === e.route;
+  var correct = D.routes.filter(function (r) { return r.id === e.route; })[0];
+  return '<div class="ev' + (done ? (right ? ' ok' : ' bad') : '') + '" data-ev="' + e.id + '">' + scene(e.id) + '<div class="evhead">' +
+    '<div class="evt">' + esc(L(e.t)) + '</div></div>' +
+    '<div class="optrow" style="margin-top:12px">' + D.routes.map(function (r) {
+      var cls = done ? (r.id === e.route ? ' ok' : sel === r.id ? ' bad' : '') : (sel === r.id ? ' sel' : '');
+      return '<button class="opt ropt' + cls + '" data-act="route" data-ev="' + e.id + '" data-v="' + r.id + '"' + (done ? ' disabled' : '') + '>' +
+        icon(r.id) + esc(L(r.t)) + '</button>';
+    }).join('') + '</div><div class="verdict tiny' + (done ? (right ? ' ok' : ' no') : '') + '" style="margin-top:8px">' +
+      (done ? esc(routeVerdict(e, right, correct)) : '') + '</div></div>';
+}
+function routeVerdict(e, right, correct) {
+  return (right ? T('Correct. ', '正確。') : T('The answer is: ', '答案是：') + L(correct.t) + T('. ', '。')) + L(e.why);
+}
+function routesNext() {
+  return '<div class="card pad nextcard"><p class="waitmsg" style="margin:0">' +
+    T('Part 2 finished. Wait for your teacher before you start Part 3.', '第 2 部分完成。請等老師指示，才開始第 3 部分。') + '</p>' +
+    '<div class="rowline" style="margin-top:14px"><a class="btn" href="#/exit">' + T('Start Part 3: Exit question', '開始第 3 部分：離堂小測') + ARROW + '</a></div></div>';
+}
 function viewRoutes() {
-  var routes = D.routes.map(function (r, i) {
-    return '<div class="route"><span class="n">' + icon(r.id) + '<b>' + (i + 1) + '</b></span><div><h3>' + esc(L(r.t)) + '</h3>' +
-      (r.d ? '<p class="d">' + esc(L(r.d)) + '</p>' : '') +
-      (r.note ? '<div class="note">' + esc(L(r.note)) + '</div>' : '') + '</div></div>';
-  }).join('');
-
-  var evs = D.evidence.map(function (e) {
-    var sel = (ST.routesPick && ST.routesPick[e.id]) || null;
-    return '<div class="ev" data-ev="' + e.id + '">' + scene(e.id) + '<div class="evhead">' +
-      '<div class="evt">' + esc(L(e.t)) + '</div></div>' +
-      '<div class="optrow" style="margin-top:12px">' + D.routes.map(function (r) {
-        return '<button class="opt ropt' + (sel === r.id ? ' sel' : '') + '" data-act="route" data-ev="' + e.id + '" data-v="' + r.id + '">' + icon(r.id) + esc(L(r.t)) + '</button>';
-      }).join('') + '</div><div class="verdict tiny" style="margin-top:8px"></div></div>';
-  }).join('');
-
-  var cons = D.consequences.map(function (c, i) {
-    var on = ST.routesCons && ST.routesCons[i];
-    return '<button class="cq' + (on ? ' on' : '') + '" data-act="conseq" data-i="' + i + '"><span class="tick">✓</span><span>' + esc(L(c)) + '</span></button>';
-  }).join('');
-
+  var done = !!ST.routesDone;
   return '<section class="view" id="v-routes"><div class="page">' +
-    stageBar(3) +
-    '<div class="pagehead"><div class="eyebrow">' + T('Development 2 · 31–41 min', '發展二 · 31–41 分鐘') + '</div>' +
-      '<h1>' + T('How it spreads, what it costs', '如何傳播，代價是甚麼') + '</h1>' +
-      '<p class="lede">' + T('Four ways in, six things that can go wrong. Match each piece of evidence to the route it belongs to.',
-        '四種入口，六種可能出錯的事。把每項證據配對到它所屬的途徑。') + '</p></div>' +
-    '<div class="twocol">' + routes + '</div>' +
-    '<h2 class="sec">' + T('Match the evidence to the route', '把證據配對到途徑') + '</h2>' +
-    '<div class="paircol evgrid">' + evs + '</div>' +
-    '<div class="rowline" style="margin-top:16px"><button class="btn" data-act="checkRoutes">' + T('Check the matches', '檢查配對') +
-      ARROW + '</button>' +
-      '<span class="muted small" id="routescore"></span></div>' +
-    '<h2 class="sec">' + T('What can happen after an infection', '感染後可能發生的事') + '</h2>' +
-    '<p class="body" style="margin-top:0">' + T('Tap each threat you can explain to your partner (textbook p. 67).',
-      '把你能向同伴解釋的威脅逐一點亮（課本第 67 頁）。') + '</p>' +
-    '<div class="conseq" style="margin-top:14px">' + cons + '</div>' +
-    '<div class="rowline" style="margin-top:26px"><a class="btn" href="#/cases">' + T('Next: case files', '下一步：個案檔案') +
-      ARROW + '</a></div>' +
+    partBar('routes', [
+      T('Watch each picture.', '看每一段動畫。'),
+      T('Choose how the malware got in.', '選擇惡意軟件是經哪個途徑進入的。'),
+      T('When all four are done, tap <b>Check</b>. You can check once only.', '四題都選好後，按<b>檢查</b>。只可以檢查一次。')
+    ]) +
+    '<div class="paircol evgrid">' + D.evidence.map(routeCard).join('') + '</div>' +
+    '<div class="rowline" style="margin-top:16px">' +
+      (done ? '' : '<button class="btn" data-act="checkRoutes">' + T('Check', '檢查') + ARROW + '</button>') +
+      '<span class="scoreline" id="routescore">' + (done ? T('You matched ', '你配對了 ') + ST.routesScore + T(' of 4.', ' / 4。') : '') + '</span></div>' +
+    '<div id="routesnext">' + (done ? routesNext() : '') + '</div>' +
     '</div></section>';
 }
 
@@ -1120,51 +1170,104 @@ function caseSummaryHTML(g) {
     '</p></div>';
 }
 
-/* ------------------------------------------------------------------ exit */
+/* ------------------------------------------------------------------ exit question (Part 3) */
+/* v4: one new case (Tina), from the class worksheet. Questions 1 and 2 are marked here.
+   Question 3 is written, so the teacher marks it from the results page. */
+function tinaIsReady() {
+  var x = ST.tina;
+  return x.types.length > 0 && !!x.route && x.p1.trim().length > 2 && x.p2.trim().length > 2;
+}
 function viewExit() {
-  var st = ST.exit;
+  var x = ST.tina, done = !!x.done, E = D.exit;
+  var types = D.types.map(function (t) {
+    var on = x.types.indexOf(t.id) >= 0, key = E.types.indexOf(t.id) >= 0;
+    var cls = done ? (key ? ' ok' : on ? ' bad' : '') : (on ? ' sel' : '');
+    return '<button class="opt topt' + cls + '" data-act="tinatype" data-v="' + t.id + '"' + tcStyle(t.id) + (done ? ' disabled' : '') +
+      ' aria-pressed="' + (on ? 'true' : 'false') + '">' + icon(t.id) + esc(t.name[0]) + ' <span class="azh">' + esc(t.name[1]) + '</span></button>';
+  }).join('');
+  var routes = D.routes.map(function (r) {
+    var cls = done ? (r.id === E.route ? ' ok' : x.route === r.id ? ' bad' : '') : (x.route === r.id ? ' sel' : '');
+    return '<button class="opt ropt' + cls + '" data-act="tinaroute" data-v="' + r.id + '"' + (done ? ' disabled' : '') + '>' + icon(r.id) + esc(L(r.t)) + '</button>';
+  }).join('');
+  var ph = escAttr(T('… because …', '……因為……')), ready = tinaIsReady();
   return '<section class="view" id="v-exit"><div class="page">' +
-    stageBar(5) +
-    '<div class="pagehead"><div class="eyebrow">' + T('Conclusion · 63–70 min', '總結 · 63–70 分鐘') + '</div>' +
-      '<h1>' + T('Exit slip', '離堂小測') + '</h1>' +
-      '<p class="lede">' + T('Three minutes, on your own. No names are collected — only your group number.',
-        '三分鐘，自行作答。不會收集姓名 —— 只記錄組別編號。') + '</p></div>' +
-    (st ? '<div class="card done-card"><h2 style="font-size:24px;font-weight:400;letter-spacing:-.02em">' + T('Thank you — handed in.', '謝謝 —— 已提交。') + '</h2>' +
-      '<p class="body" style="margin-top:12px">' + T('Your teacher will use these to plan the next lesson.', '教師會用這些答案規劃下一課。') + '</p>' +
-      '<div class="rowline" style="justify-content:center;margin-top:22px"><a class="btn ghost" href="#/homework">' + T('Homework', '功課') + '</a></div></div>'
-    : '<div class="card pad"><div class="rowline" style="margin-bottom:10px"><span class="small muted">' + T('Timer', '計時') + '</span>' +
-        '<span class="timer" id="exittimer">3:00</span><button class="btn ghost sm" data-act="exittimer">' + T('Start', '開始') + '</button></div>' +
-      '<div class="exitq"><div class="qh"><span class="qn">a</span><p class="qt">' + T('Name ONE type of malware and give the clue that helps you identify it.', '說出一種惡意軟件，並指出幫助你辨識它的線索。') + '</p></div>' +
-        '<div class="optrow" id="exittype">' + D.types.map(function (t) {
-          return '<button class="opt topt" data-act="extype" data-v="' + t.id + '"' + tcStyle(t.id) + '>' + icon(t.id) + esc(t.name[0]) + '</button>';
-        }).join('') + '</div>' +
-        '<div class="because" style="margin-top:10px"><span class="bl">' + T('clue', '線索') + '</span><input type="text" id="exitclue" placeholder="' + T('the clue that gives it away', '出賣它的線索') + '"></div></div>' +
-      '<div class="exitq"><div class="qh"><span class="qn">b</span><p class="qt">' + T('What is ONE likely way you could have become infected?', '你可能經由哪一個途徑被感染？') + '</p></div>' +
-        '<div class="optrow" id="exitroute">' + D.routes.map(function (r) {
-          return '<button class="opt ropt" data-act="exroute" data-v="' + r.id + '">' + icon(r.id) + esc(L(r.t)) + '</button>';
-        }).join('') + '</div></div>' +
-      '<div class="exitq"><div class="qh"><span class="qn">c</span><p class="qt">' + T('What is ONE damage it could cause?', '它可能造成哪一項損害？') + '</p></div>' +
-        '<input type="text" id="exitdmg" placeholder="' + T('one consequence', '一項後果') + '"></div>' +
-      '<div class="rowline" style="margin-top:18px"><button class="btn" data-act="exitsubmit">' + T('Hand in', '提交') +
-        ARROW + '</button>' +
-        '<span class="muted small">' + T('On your own. Your group number is ', '自行作答。你的組別是 ') + ST.group + '.</span></div></div>') +
-    '</div></section>';
+    partBar('exit', [
+      T('Read the new case.', '閱讀新個案。'),
+      T('Answer the three questions on your own.', '自己回答三條問題。'),
+      T('Tap <b>Hand in</b>. You cannot change your answers after that.', '按<b>提交</b>。提交後不能更改答案。')
+    ]) +
+    '<div class="card pad casecard"><div class="casetag">' + T('New case', '新個案') + ' · Tina</div><p class="casetext">' + esc(L(E.text)) + '</p></div>' +
+    '<div class="card pad exitcard">' +
+      '<div class="exitq"><div class="qh"><span class="qn">1</span><p class="qt">' + L(E.q1) + '</p></div>' +
+        '<div class="optrow" id="tinatypes">' + types + '</div>' +
+        (done ? '<div class="fb show ' + (x.s1 === 2 ? 'ok' : 'no') + '"><b>' + x.s1 + ' / 2.</b> ' + esc(L(E.why1)) + '</div>' : '') + '</div>' +
+      '<div class="exitq"><div class="qh"><span class="qn">2</span><p class="qt">' + esc(L(E.q2)) + '</p></div>' +
+        '<div class="optrow" id="tinaroutes">' + routes + '</div>' +
+        (done ? '<div class="fb show ' + (x.s2 === 1 ? 'ok' : 'no') + '"><b>' + x.s2 + ' / 1.</b> ' + esc(L(E.why2)) + '</div>' : '') + '</div>' +
+      '<div class="exitq"><div class="qh"><span class="qn">3</span><p class="qt">' + L(E.q3) + '</p></div>' +
+        '<div class="because"><span class="bl">1</span><input type="text" id="tinap1" maxlength="160" autocomplete="off" placeholder="' + ph + '" value="' + escAttr(x.p1) + '"' + (done ? ' disabled' : '') + '></div>' +
+        '<div class="because"><span class="bl">2</span><input type="text" id="tinap2" maxlength="160" autocomplete="off" placeholder="' + ph + '" value="' + escAttr(x.p2) + '"' + (done ? ' disabled' : '') + '></div>' +
+        (done ? '<div class="fb show hint"><b>' + T('Your teacher marks this question. Example answers: ', '這一題由老師批改。參考答案：') + '</b>' + esc(L(E.model)) + '</div>' : '') + '</div>' +
+      (done
+        ? '<div class="rowline" style="margin-top:18px"><a class="btn" href="#/results">' + T('See my results', '查看我的成績') + ARROW + '</a></div>'
+        : '<div class="rowline" style="margin-top:18px"><button class="btn" data-act="tinasubmit" id="tinasubmit"' + (ready ? '' : ' disabled') + '>' + T('Hand in', '提交') + ARROW + '</button>' +
+          '<span class="muted small" id="tinahint">' + (ready ? '' : T('Answer all three questions first.', '請先回答全部三條問題。')) + '</span></div>') +
+    '</div></div></section>';
+}
+/* keep what is typed, and switch the Hand in button on when everything is answered */
+function tinaSync() {
+  var a = document.getElementById('tinap1'), c = document.getElementById('tinap2');
+  if (a) ST.tina.p1 = a.value;
+  if (c) ST.tina.p2 = c.value;
+  var ready = tinaIsReady(), btn = document.getElementById('tinasubmit'), hint = document.getElementById('tinahint');
+  if (btn) btn.disabled = !ready;
+  if (hint) hint.textContent = ready ? '' : T('Answer all three questions first.', '請先回答全部三條問題。');
+  return ready;
 }
 
 /* ------------------------------------------------------------------ homework */
+/* v4: the homework is the group's own sheet (16 marks), handed out on paper */
+function homeworkCard() {
+  return '<div class="card pad hwcard"><h3 class="sub">' + T('Homework', '功課') + '</h3>' +
+    '<p class="body" style="margin-top:4px">' + esc(L(D.homework2.text)) + '</p>' +
+    '<ul class="bullets">' + D.homework2.parts.map(function (p) { return '<li>' + esc(L(p)) + '</li>'; }).join('') + '</ul></div>';
+}
 function viewHomework() {
-  var blocks = D.homework.map(function (h) {
-    return '<div class="card pad"><h3 class="sub">' + esc(L(h.ref)) + '</h3>' +
-      '<p class="body" style="margin-top:4px">' + esc(L(h.ask)) + '</p>' +
-      '<ul class="bullets">' + h.steps.map(function (s) { return '<li>' + esc(L(s)) + '</li>'; }).join('') + '</ul></div>';
-  }).join('');
-  return '<section class="view" id="v-homework"><div class="page">' +
-    '<div class="pagehead"><div class="eyebrow">' + T('After class', '課後') + '</div>' +
-      '<h1>' + T('Homework', '功課') + '</h1>' +
-      '<p class="lede">' + T('Two questions from the textbook, with a structure — not an answer. Hand in on paper.',
-        '兩道教科書題目，附上結構而非答案。以紙本提交。') + '</p></div>' +
-    '<div class="stack">' + blocks + '</div>' +
-    '<div class="rowline" style="margin-top:26px"><a class="btn ghost" href="#/learn">' + T('Back to the six types', '回到六種類型') + '</a></div>' +
+  return '<section class="view" id="v-homework"><div class="page narrow">' +
+    '<div class="homehead"><h1>' + T('Homework', '功課') + '</h1></div>' + homeworkCard() +
+    '<div class="rowline" style="margin-top:22px"><a class="btn ghost" href="#/">' + T('Back to the start', '返回開始頁') + '</a></div>' +
+    '</div></section>';
+}
+
+/* ------------------------------------------------------------------ results */
+/* v4: one card with the three scores and the two written answers. Students type their
+   class number, take a screenshot and post it on the class Padlet. Nothing is sent anywhere. */
+function viewResults() {
+  var x = ST.tina, rows = [
+    [T('Part 1 · Quiz', '第 1 部分 · 測驗'), quizScore(), quizOrder().length],
+    [T('Part 2 · Match the routes', '第 2 部分 · 途徑配對'), ST.routesScore || 0, D.evidence.length],
+    [T('Part 3 · Exit question', '第 3 部分 · 離堂小測'), x.score || 0, 3]
+  ];
+  var total = 0, max = 0;
+  rows.forEach(function (r) { total += r[1]; max += r[2]; });
+  var day = '';
+  try { day = new Date().toLocaleDateString(lang === 'zh' ? 'zh-HK' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) {}
+  return '<section class="view" id="v-results"><div class="page">' +
+    partBar('results', [
+      T('Type your class number on the card.', '在成績卡上輸入你的班號。'),
+      T('Take a screenshot of the card.', '把成績卡截圖。'),
+      T('Post the screenshot on the class Padlet.', '把截圖貼到班的 Padlet。')
+    ]) +
+    '<div class="card pad resultcard" id="resultcard">' +
+      '<div class="rhead"><div><div class="rtitle">CyberGuard · ' + T('My results', '我的成績') + '</div><div class="rdate">' + esc(day) + '</div></div>' +
+        '<label class="rno"><span>' + T('Class number', '班號') + '</span><input type="text" id="classno" inputmode="numeric" autocomplete="off" value="' + escAttr(ST.classNo) + '" placeholder="?"></label></div>' +
+      '<table class="rtable"><tbody>' + rows.map(function (r) {
+        return '<tr><th scope="row">' + r[0] + '</th><td><b>' + r[1] + '</b> / ' + r[2] + '</td></tr>';
+      }).join('') +
+      '<tr class="rtotal"><th scope="row">' + T('Total', '總分') + '</th><td><b>' + total + '</b> / ' + max + '</td></tr></tbody></table>' +
+      '<div class="rwritten"><div class="rlabel">' + T('Part 3, question 3 — my two answers (the teacher marks these)', '第 3 部分第 3 題 —— 我的兩個答案（由老師批改）') + '</div>' +
+        '<ol><li>' + (esc(x.p1) || '—') + '</li><li>' + (esc(x.p2) || '—') + '</li></ol></div>' +
+    '</div>' + homeworkCard() +
     '</div></section>';
 }
 
@@ -1206,6 +1309,14 @@ function viewTeacher() {
       c.key.harms.map(function (h) { return esc(L(h)); }).join('<br>') + '</td></tr>';
   }).join('');
 
+  var routeKey = D.evidence.map(function (e) {
+    var r = D.routes.filter(function (x) { return x.id === e.route; })[0];
+    return '<tr><td>' + esc(L(e.t)) + '</td><td>' + esc(L(r.t)) + '</td></tr>';
+  }).join('');
+  var tinaKey = '<tr><td>Tina · ' + T('type (2 marks)', '類型（2 分）') + '</td><td>' + D.exit.types.map(function (id) {
+      return esc(L(D.types.filter(function (x) { return x.id === id; })[0].name)); }).join(' + ') + '</td></tr>' +
+    '<tr><td>Tina · ' + T('route (1 mark)', '途徑（1 分）') + '</td><td>' + esc(L(D.routes.filter(function (x) { return x.id === D.exit.route; })[0].t)) + '</td></tr>' +
+    '<tr><td>Tina · ' + T('two problems (the teacher marks)', '兩個問題（老師批改）') + '</td><td>' + esc(L(D.exit.model)) + '</td></tr>';
   var cross = D.crossref.map(function (r) {
     return '<tr><td>' + r[0] + '</td><td>' + esc(T(r[1].split(' / ')[0], r[1].split(' / ')[1] || r[1])) + '</td><td><code>' + r[2] + '</code></td><td>' + r[3] + '</td></tr>';
   }).join('');
@@ -1219,17 +1330,32 @@ function viewTeacher() {
       '<button class="btn ghost" data-act="resetAll">' + T('Clear all data on this device', '清除本裝置所有資料') + '</button>' +
       '<button class="btn ghost" data-act="lock">' + T('Lock', '鎖定') + '</button></div>' +
 
-    '<h2 class="sec">' + T('Lesson cross-reference', '教案對照表') + '</h2>' +
-    '<div class="card pad"><table class="t"><thead><tr><th>' + T('Min', '分鐘') + '</th><th>' + T('Step', '步驟') + '</th><th>' + T('Page', '頁面') + '</th><th>Slide</th></tr></thead><tbody>' + cross + '</tbody></table></div>' +
+    '<div class="card pad" style="margin-bottom:22px"><p class="body" style="margin:0">' +
+      T('This device is unlocked: every part opens without finishing the one before it. Tap <b>Lock</b> before a student uses this device.',
+        '本裝置已解鎖：不用完成上一部分也可以進入任何部分。交給學生使用前請按<b>鎖定</b>。') + '</p></div>' +
 
-    '<h2 class="sec">' + T('Answer key — picture items', '答案 —— 圖片題') + '</h2>' +
+    '<h2 class="sec">' + T('Three tools for this lesson', '本課的三樣工具') + '</h2>' +
+    '<div class="card pad"><table class="t"><thead><tr><th>' + T('Tool', '工具') + '</th><th>' + T('Who uses it', '誰使用') + '</th><th>' + T('What it is for', '用途') + '</th></tr></thead><tbody>' +
+      '<tr><td><b>' + T('Teaching slides', '教學簡報') + '</b></td><td>' + T('Teacher, on the projector', '老師，用投影機') + '</td><td>' +
+        T('Hook, six types, Table 5.1, four routes, the four cases', '引入、六種類型、表 5.1、四種途徑、四個個案') + '</td></tr>' +
+      '<tr><td><b>' + T('This website', '本網站') + '</b></td><td>' + T('Each student, on a tablet', '每位學生，用平板電腦') + '</td><td>' +
+        T('Tests only: Part 1 Quiz, Part 2 Match the routes, Part 3 Exit question, then My results', '只做測驗：第 1 部分測驗、第 2 部分途徑配對、第 3 部分離堂小測，然後是「我的成績」') + '</td></tr>' +
+      '<tr><td><b>' + T('Worksheet', '工作紙') + '</b></td><td>' + T('Groups, on paper', '小組，用紙本') + '</td><td>' + T('Case study and peer check', '個案研究及同儕互評') + '</td></tr>' +
+    '</tbody></table>' +
+    '<p class="small muted" style="margin-top:14px">' + T('Earlier teaching pages, kept for the projector: ', '早前的教學頁面，保留作投影用：') +
+      '<a class="quiet" href="#/hook">' + T('Hook', '引入') + '</a> · <a class="quiet" href="#/learn">' + T('Six types', '六種類型') + '</a> · <a class="quiet" href="#/cases">' + T('Case files', '個案') + '</a></p></div>' +
+
+    '<h2 class="sec">' + T('Answer key — Part 1, questions 1–6 (A1–A6)', '答案 —— 第 1 部分第 1–6 題（A1–A6）') + '</h2>' +
     '<div class="card pad"><table class="t"><thead><tr><th>#</th><th>' + T('Type', '類型') + '</th><th>' + T('Decisive clue', '決定性線索') + '</th></tr></thead><tbody>' + itemKey + '</tbody></table></div>' +
 
-    '<h2 class="sec">' + T('Answer key — Checkpoint', '答案 —— Checkpoint') + '</h2>' +
+    '<h2 class="sec">' + T('Answer key — Part 1, questions 7–10 (B1–B4)', '答案 —— 第 1 部分第 7–10 題（B1–B4）') + '</h2>' +
     '<div class="card pad"><table class="t"><thead><tr><th>#</th><th>' + T('Key', '答案') + '</th><th>' + T('Reasoning', '理由') + '</th></tr></thead><tbody>' + cpKey + '</tbody></table></div>' +
 
     '<h2 class="sec">' + T('Answer key — cases', '答案 —— 個案') + '</h2>' +
     '<div class="card pad"><table class="t"><thead><tr><th>' + T('Case', '個案') + '</th><th>' + T('Type', '類型') + '</th><th>' + T('Route', '途徑') + '</th><th>' + T('Two harms', '兩項損害') + '</th></tr></thead><tbody>' + caseKey + '</tbody></table></div>' +
+
+    '<h2 class="sec">' + T('Answer key — Part 2 and Part 3', '答案 —— 第 2 及第 3 部分') + '</h2>' +
+    '<div class="card pad"><table class="t"><thead><tr><th>' + T('Item', '題目') + '</th><th>' + T('Answer', '答案') + '</th></tr></thead><tbody>' + routeKey + tinaKey + '</tbody></table></div>' +
 
     '<h2 class="sec">' + T('Class summary', '班級摘要') + '</h2>' +
     '<div class="card pad"><p class="body" style="margin-top:0">' + T('This device answered ', '本裝置已答 ') + quizScore() + T(' of 10. Enter the item your class missed most, then discuss it before the textbook page.',
@@ -1265,8 +1391,8 @@ function viewAbout() {
         T('Every pop-up, e-mail, application and case on this site is fictional and drawn for this project. No real malware, executable or live malicious link is hosted or linked. Domain names use the reserved .example suffix.',
           '本網站所有彈出視窗、電郵、應用程式及個案均為本專題虛構及繪製。網站沒有寄存或連結任何真實惡意軟件、執行檔或可用的惡意連結。網域一律使用保留的 .example 後綴。') + '</p></div>' +
       '<div class="card pad"><h3 class="sub">' + T('Privacy', '私隱') + '</h3><p class="body" style="margin-top:0">' +
-        T('No names, e-mail addresses or student identifiers are collected. Answers are stored only in this browser, on this device, and can be cleared from the teacher area. There is no server, no account and no analytics.',
-          '不收集姓名、電郵或任何學生識別資料。答案只儲存在本裝置的瀏覽器中，可在教師專區清除。沒有伺服器、沒有帳戶、沒有分析工具。') + '</p></div>' +
+        T('The site sends nothing anywhere: there is no server, no account and no analytics. Answers, and the class number typed on the results page, are stored only in this browser on this device, and can be cleared from the teacher area. No names or e-mail addresses are asked for.',
+          '本網站不會傳送任何資料：沒有伺服器、沒有帳戶、沒有分析工具。答案以及在成績頁輸入的班號，只儲存在本裝置的瀏覽器中，可在教師專區清除。網站不會要求輸入姓名或電郵。') + '</p></div>' +
       '<div class="card pad"><h3 class="sub">' + T('Accessibility', '無障礙') + '</h3><p class="body" style="margin-top:0">' +
         T('Contrast meets WCAG 2.1 AA. Every illustration has a text alternative describing what it shows. All controls work from the keyboard and have visible focus. A “reduce motion” setting stops the background animation and shows every reveal at once.',
           '對比度符合 WCAG 2.1 AA。每幅插圖都有描述其內容的替代文字。所有控制項均可使用鍵盤操作並有清晰的焦點框。「減少動態效果」設定會停止背景動畫，並一次過顯示所有文字。') + '</p>' +
@@ -1331,13 +1457,14 @@ function viewPrint() {
 
 /* ========================================================================== 4. router */
 var VIEWS = {
-  home: { render: viewHome, after: initHome },
+  home: { render: viewHome, after: null },
   hook: { render: viewHook, after: null },
   learn: { render: viewLearn, after: null },
   quiz: { render: viewQuiz, after: renderQuiz },
   routes: { render: viewRoutes, after: null },
   cases: { render: viewCases, after: initCases },
   exit: { render: viewExit, after: null },
+  results: { render: viewResults, after: null },
   homework: { render: viewHomework, after: null },
   teacher: { render: viewTeacher, after: null },
   about: { render: viewAbout, after: null },
@@ -1351,15 +1478,26 @@ function parseHash() {
   var name = (h.split('?')[0] || 'home').trim() || 'home';
   return VIEWS[name] ? name : 'home';
 }
+var TITLES = { quiz: ['Quiz', '測驗'], routes: ['Match the routes', '途徑配對'], exit: ['Exit question', '離堂小測'], results: ['My results', '我的成績'],
+  homework: ['Homework', '功課'], teacher: ['Teacher', '教師'], about: ['About', '關於'], print: ['Print pack', '印刷包'],
+  hook: ['Hook', '引入'], learn: ['Six types', '六種類型'], cases: ['Case files', '個案'] };
 function render(name) {
+  /* v4: a part opens only when the part before it is finished; the old teaching pages need the teacher code */
+  var notice = '', asked = name;
+  if (partIndex(name) >= 0 && !partOpen(name)) {
+    name = nextPart();
+    notice = T('Finish "' + L(PARTS[partIndex(name)].t) + '" first.', '請先完成「' + L(PARTS[partIndex(name)].t) + '」。');
+  } else if (TEACHER_ONLY[name] && !ST.unlocked) {
+    name = 'home';
+  }
+  if (name !== asked) { try { history.replaceState(null, '', '#/' + (name === 'home' ? '' : name)); } catch (e) {} }
   current = name;
   document.body.setAttribute('data-view', name);
   document.documentElement.lang = lang;
   app.innerHTML = VIEWS[name].render();
   var el = app.querySelector('.view'); if (el) el.setAttribute('data-active', '');
-  document.title = (name === 'home'
-    ? T('CyberGuard — Malware Mission', 'CyberGuard — 惡意軟件任務')
-    : T('CyberGuard — ', 'CyberGuard — ') + T({ quiz: 'Quiz', learn: 'Six types', cases: 'Case files', routes: 'Routes', exit: 'Exit slip', homework: 'Homework', teacher: 'Teacher', about: 'About', print: 'Print pack' }[name] || ''));
+  document.title = name === 'home' ? T('CyberGuard — Malware tests', 'CyberGuard — 惡意軟件小測') : 'CyberGuard — ' + L(TITLES[name] || ['', '']);
+  if (notice) toast(notice);
   document.querySelectorAll('.links a').forEach(function (a) {
     if (a.getAttribute('data-nav') === name) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -1558,39 +1696,60 @@ app.addEventListener('click', function (e) {
   }
 
   if (act === 'route') {
+    if (ST.routesDone) return;
     ST.routesPick = ST.routesPick || {};
     ST.routesPick[b.getAttribute('data-ev')] = b.getAttribute('data-v');
     save();
-    /* v3: update the cards in place. Drawing the whole page again would restart the animated scenes. */
+    /* update the card in place. Drawing the whole page again would restart the animated scenes. */
     var evCard = b.closest('.ev');
     if (!evCard) { render('routes'); return; }
     evCard.querySelectorAll('[data-act="route"]').forEach(function (o) { o.classList.toggle('sel', o === b); });
-    app.querySelectorAll('.ev').forEach(function (c) {
-      c.classList.remove('ok', 'bad');
-      var vd = c.querySelector('.verdict');
-      if (vd) { vd.className = 'verdict tiny'; vd.textContent = ''; }
-    });
+    var vd0 = evCard.querySelector('.verdict');
+    if (vd0) { vd0.className = 'verdict tiny'; vd0.textContent = ''; }
     var rs = document.getElementById('routescore');
     if (rs) rs.textContent = '';
     return;
   }
   if (act === 'checkRoutes') {
+    if (ST.routesDone) return;
+    var picks = ST.routesPick || {};
+    var missing = D.evidence.filter(function (ev) { return !picks[ev.id]; });
+    if (missing.length) {
+      /* v4: nothing is marked until all four are answered */
+      D.evidence.forEach(function (ev) {
+        var c0 = app.querySelector('.ev[data-ev="' + ev.id + '"]'), v0 = c0 && c0.querySelector('.verdict');
+        if (!v0) return;
+        v0.className = 'verdict tiny' + (picks[ev.id] ? '' : ' no');
+        v0.textContent = picks[ev.id] ? '' : T('Choose a route first.', '請先選擇一個途徑。');
+      });
+      var sc0 = document.getElementById('routescore');
+      if (sc0) sc0.textContent = T('Answer all four, then check.', '四題都選好後才檢查。');
+      return;
+    }
     var score = 0;
+    D.evidence.forEach(function (ev) { if (picks[ev.id] === ev.route) score++; });
+    ST.routesDone = true; ST.routesScore = score; save();
+    /* mark the cards in place, so the pictures keep playing */
     D.evidence.forEach(function (ev) {
-      var card = app.querySelector('[data-ev="' + ev.id + '"]');
-      var pick = ST.routesPick && ST.routesPick[ev.id];
-      var right = pick === ev.route;
-      if (right) score++;
-      card.classList.remove('ok', 'bad');
-      /* v3: v2 called classList.add('') for an unanswered card, which throws and blanks the page */
-      if (pick) card.classList.add(right ? 'ok' : 'bad');
-      var v = card.querySelector('.verdict');
-      v.className = 'verdict tiny ' + (right ? 'ok' : 'no');
-      v.style.marginTop = '8px';
-      v.textContent = pick ? (right ? T('Correct. ', '正確。') + L(ev.why) : T('Not this route. Think about how the code travelled.', '不是這個途徑。想想程式碼是怎樣傳播的。')) : T('Choose a route first.', '請先選擇一個途徑。');
+      var card = app.querySelector('.ev[data-ev="' + ev.id + '"]'); if (!card) return;
+      var pick = picks[ev.id], right = pick === ev.route;
+      var correct = D.routes.filter(function (r) { return r.id === ev.route; })[0];
+      card.classList.add(right ? 'ok' : 'bad');
+      card.querySelectorAll('[data-act="route"]').forEach(function (o) {
+        var v = o.getAttribute('data-v');
+        o.disabled = true; o.classList.remove('sel');
+        if (v === ev.route) o.classList.add('ok'); else if (v === pick) o.classList.add('bad');
+      });
+      var vd = card.querySelector('.verdict');
+      vd.className = 'verdict tiny ' + (right ? 'ok' : 'no');
+      vd.textContent = routeVerdict(ev, right, correct);
     });
     var sc = document.getElementById('routescore');
     if (sc) sc.textContent = T('You matched ', '你配對了 ') + score + T(' of 4.', ' / 4。');
+    if (b.parentNode) b.parentNode.removeChild(b);
+    var nx = document.getElementById('routesnext');
+    if (nx) nx.innerHTML = routesNext();
+    syncParts();
     return;
   }
   if (act === 'conseq') {
@@ -1625,23 +1784,28 @@ app.addEventListener('click', function (e) {
   if (act === 'clearcase') { ST.cases[ST.group] = null; save(); render('cases'); return; }
   if (act === 'printcase') { renderPrintCase(); return; }
 
-  if (act === 'exittimer') { startExitTimer(b); return; }
-  if (act === 'extype') {
-    app.querySelectorAll('#exittype .opt').forEach(function (o) { o.classList.toggle('sel', o === b); });
-    ST._exType = b.getAttribute('data-v'); return;
+  if (act === 'tinatype') {
+    if (ST.tina.done) return;
+    var tv = b.getAttribute('data-v'), ti = ST.tina.types.indexOf(tv);
+    if (ti >= 0) ST.tina.types.splice(ti, 1); else ST.tina.types.push(tv);
+    b.classList.toggle('sel', ti < 0);
+    b.setAttribute('aria-pressed', ti < 0 ? 'true' : 'false');
+    tinaSync(); save(); return;
   }
-  if (act === 'exroute') {
-    app.querySelectorAll('#exitroute .opt').forEach(function (o) { o.classList.toggle('sel', o === b); });
-    ST._exRoute = b.getAttribute('data-v'); return;
+  if (act === 'tinaroute') {
+    if (ST.tina.done) return;
+    ST.tina.route = b.getAttribute('data-v');
+    app.querySelectorAll('#tinaroutes .opt').forEach(function (o) { o.classList.toggle('sel', o === b); });
+    tinaSync(); save(); return;
   }
-  if (act === 'exitsubmit') {
-    var type = ST._exType || null, clue = (document.getElementById('exitclue') || {}).value || '';
-    var route = ST._exRoute || null, dmg = (document.getElementById('exitdmg') || {}).value || '';
-    var t = type ? D.types.filter(function (x) { return x.id === type; })[0] : null;
-    var clueOk = !!(t && clue && (L(t.tell).toLowerCase().split(/[^a-z\u4e00-\u9fff]+/).some(function (w) {
-      return w.length > 3 && clue.toLowerCase().indexOf(w) >= 0;
-    })));
-    ST.exit = { type: type, clue: clue, clueOk: clueOk, route: route, damage: dmg, group: ST.group, at: Date.now() };
+  if (act === 'tinasubmit') {
+    var tx = ST.tina;
+    if (tx.done || !tinaSync()) return;
+    var hit = 0, extra = 0;
+    tx.types.forEach(function (id) { if (D.exit.types.indexOf(id) >= 0) hit++; else extra++; });
+    tx.s1 = Math.max(0, hit - extra);                 /* 2 marks; each wrong extra choice takes one away */
+    tx.s2 = tx.route === D.exit.route ? 1 : 0;
+    tx.score = tx.s1 + tx.s2; tx.done = true;
     save(); render('exit'); return;
   }
 
@@ -1656,6 +1820,8 @@ app.addEventListener('click', function (e) {
   if (act === 'resetAll') {
     if (confirm(T('Clear all answers on this device?', '清除本裝置所有答案？'))) {
       ST.quiz = {}; ST.checkpoint = {}; ST.cases = {}; ST.exit = null; ST.routesPick = {}; ST.routesCons = {};
+      ST.routesDone = false; ST.routesScore = 0; ST.classNo = ''; quizPos = null;
+      ST.tina = { types: [], route: null, p1: '', p2: '', done: false, score: 0, s1: 0, s2: 0 };
       ST.hook = { before: null, after: null }; save(); render(current);
     }
     return;
@@ -1692,6 +1858,17 @@ app.addEventListener('input', function (e) {
 
 /* text fields must not be wiped by a re-render while typing */
 app.addEventListener('focusin', function (e) { e.target.dataset.focus = '1'; });
+
+/* v4: keep what is typed (exit question, class number) while it is typed */
+app.addEventListener('input', function (e) {
+  var id = e.target && e.target.id;
+  if (id === 'tinap1' || id === 'tinap2') { if (!ST.tina.done) { tinaSync(); save(); } }
+  else if (id === 'classno') {
+    ST.classNo = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+    if (e.target.value !== ST.classNo) e.target.value = ST.classNo;
+    save();
+  }
+});
 
 function initCases() {
   var sum = document.getElementById('sumline');

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CyberGuard — Malware Mission / 惡意軟件任務</title>
+<title>CyberGuard — Malware tests / 惡意軟件小測</title>
 <meta name="description" content="A bilingual (EN / 繁體中文) classroom web app for the S4 ICT lesson Network Security Risks: Malware. All scenarios are simulated — no real malware is hosted or linked.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#060d22">
@@ -25,12 +25,6 @@
     <span class="brandname">CyberGuard</span>
   </a>
 
-  <nav class="links" id="navlinks" aria-label="Main">
-    <a href="#/learn" data-nav="learn"><span class="en">Learn</span><span class="zh">學習</span></a>
-    <a href="#/quiz" data-nav="quiz"><span class="en">Quiz</span><span class="zh">測驗</span></a>
-    <a href="#/cases" data-nav="cases"><span class="en">Case files</span><span class="zh">個案</span></a>
-    <a href="#/teacher" data-nav="teacher"><span class="en">Teacher</span><span class="zh">教師</span></a>
-  </nav>
 
   <div class="navright">
     <button class="langbtn" id="langbtn" type="button" aria-label="Switch language / 切換語言">
@@ -51,6 +45,7 @@
 
 <script>window.addEventListener("error",function(e){var m=document.getElementById("app");if(m)m.textContent="ERROR: "+e.message+" @ "+(e.filename||"").split("/").pop()+":"+e.lineno+":"+e.colno;});</script>
 <script src="data.js"></script>
+<script src="scenes.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
