@@ -1226,7 +1226,7 @@ function tinaSync() {
 }
 
 /* ------------------------------------------------------------------ homework */
-/* v4: the homework is the group's own sheet (16 marks), handed out on paper */
+/* v4: the homework is the group's own sheet (18 marks), handed out on paper */
 function homeworkCard() {
   return '<div class="card pad hwcard"><h3 class="sub">' + T('Homework', '功課') + '</h3>' +
     '<p class="body" style="margin-top:4px">' + esc(L(D.homework2.text)) + '</p>' +

@@ -324,11 +324,11 @@ exit: {
           '其他人可以未經許可閱讀或發送她的電郵，因為他們有她的密碼。她的其他帳戶也可能被盜，因為附加元件會記錄她輸入的所有內容。']
 },
 
-/* v4: the homework is the group's own sheet, handed out on paper (16 marks) */
+/* v4: the homework is the group's own sheet, handed out on paper (18 marks) */
 homework2: {
-  text: ['Finish the homework sheet your teacher gives you (16 marks). Hand it in on paper.', '完成老師派發的家課工作紙（共 16 分），以紙本提交。'],
+  text: ['Finish the homework sheet your teacher gives you (18 marks). Hand it in on paper.', '完成老師派發的家課工作紙（共 18 分），以紙本提交。'],
   parts: [['Part A: match the six types of malware (6 marks)', '甲部：配對六種惡意軟件（6 分）'],
-          ['Part B: one multiple-choice question (1 mark)', '乙部：一條選擇題（1 分）'],
+          ['Part B: three multiple-choice questions (3 marks)', '乙部：三條選擇題（3 分）'],
           ['Part C: two cases, Peter and Tom (9 marks)', '丙部：兩個個案，Peter 和 Tom（9 分）']]
 },
 

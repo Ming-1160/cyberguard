@@ -45,7 +45,7 @@ So the student side of the site is now short and runs in one fixed order:
    for the teacher.
 4. **My results** — one card with the three scores and the two written answers. The student
    types a class number, takes a screenshot and posts it on the class Padlet. The homework
-   (the group's own sheet, 16 marks) is shown under the card.
+   (the group's own sheet, 18 marks) is shown under the card.
 
 **Simple on purpose**
 - The start page is one list of the four parts and one button.
