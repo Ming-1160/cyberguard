@@ -309,6 +309,9 @@ crossref: [
 
 /* ---------------------------------------------------------------- v4: Part 3, the exit question
    The case is E2 on the class worksheet. Two types fit, so both are accepted. */
+/* v4.1: the class Padlet where students post the screenshot of My results. Set to '' to hide the button. */
+padlet: 'https://padlet.com/s1160846/malware-student-result-s025drnzrwnngtnwmp0o',
+
 exit: {
   text: ['Tina downloads a free homework-helper browser add-on from an unfamiliar website. It works as normal, but it secretly collects what she types. A week later, someone logs in to her school email with her password.',
          'Tina 從一個不熟悉的網站下載了一個免費的「功課助手」瀏覽器附加元件。它運作正常，但暗中收集她輸入的內容。一星期後，有人用她的密碼登入了她的學校電郵。'],

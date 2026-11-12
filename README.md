@@ -4,7 +4,7 @@ A bilingual (English / 繁體中文) classroom web app for the S4 ICT lesson
 **Network Security Risks: Malware** (70 minutes, 32 students, one tablet each).
 
 > Sections below "Version 3" describe earlier versions of the site. Where they differ from
-> the Version 4 notes, the Version 4 notes are the current ones.
+> the Version 4 and 4.1 notes, those notes are the current ones.
 
 It is the educational digital tool and the digital student worksheet described in
 `INT2065_Malware_Website_Outline.docx` — the same six picture items, the same four
@@ -24,6 +24,16 @@ files. To update the site, push the same commit to both branches:
 ```bash
 git push origin main main:gh-pages
 ```
+
+
+## Version 4.1 (12 Nov 2026) — what changed
+
+- **The teacher code is no longer printed on the lock screen.** The code itself is the same.
+  It is still written in `app.js`, so this is basic protection only: it stops a student from
+  reading the code off the screen and opening every part.
+- **My results has an "Open the class Padlet" button.** It opens the class board in a new tab,
+  so the results card stays open. The address is `padlet` in `data.js`; set it to `''` to hide
+  the button.
 
 
 ## Version 4 (11 Nov 2026) — what changed
@@ -210,8 +220,8 @@ The same card is voted on twice: before the lesson, and again at 63–65 min.
 
 ## Before the lesson
 
-1. **Change the teacher PIN.** In `app.js` look for `pin === '2065'` and edit both
-   the value and the hint on the lock screen.
+1. **Change the teacher PIN.** In `app.js` look for `pin === '2065'` and edit the value.
+   From version 4.1 the lock screen shows no hint.
 2. **Checkpoint wording is paraphrased on purpose.** The four Checkpoint items in
    `data.js` follow Checkpoint 5.1 (p. 63) and 5.2 (p. 66) with the same answer keys
    (A, C, D, C), but the option wording is our own, so the textbook text is not copied

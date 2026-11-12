@@ -1256,7 +1256,8 @@ function viewResults() {
     partBar('results', [
       T('Type your class number on the card.', '在成績卡上輸入你的班號。'),
       T('Take a screenshot of the card.', '把成績卡截圖。'),
-      T('Post the screenshot on the class Padlet.', '把截圖貼到班的 Padlet。')
+      D.padlet ? T('Tap “Open the class Padlet” and post the screenshot.', '按「開啟班的 Padlet」，把截圖貼上去。')
+               : T('Post the screenshot on the class Padlet.', '把截圖貼到班的 Padlet。')
     ]) +
     '<div class="card pad resultcard" id="resultcard">' +
       '<div class="rhead"><div><div class="rtitle">CyberGuard · ' + T('My results', '我的成績') + '</div><div class="rdate">' + esc(day) + '</div></div>' +
@@ -1267,7 +1268,11 @@ function viewResults() {
       '<tr class="rtotal"><th scope="row">' + T('Total', '總分') + '</th><td><b>' + total + '</b> / ' + max + '</td></tr></tbody></table>' +
       '<div class="rwritten"><div class="rlabel">' + T('Part 3, question 3 — my two answers (the teacher marks these)', '第 3 部分第 3 題 —— 我的兩個答案（由老師批改）') + '</div>' +
         '<ol><li>' + (esc(x.p1) || '—') + '</li><li>' + (esc(x.p2) || '—') + '</li></ol></div>' +
-    '</div>' + homeworkCard() +
+    '</div>' +
+    /* v4.1: the Padlet opens in a new tab, so the results card stays open in this one */
+    (D.padlet ? '<div class="rowline padletrow"><a class="btn" id="padletlink" href="' + escAttr(D.padlet) + '" target="_blank" rel="noopener">' + T('Open the class Padlet', '開啟班的 Padlet') + '</a>' +
+      '<span class="small muted">' + T('It opens in a new tab. Post your screenshot there.', '會在新分頁開啟。把截圖貼在那裏。') + '</span></div>' : '') +
+    homeworkCard() +
     '</div></section>';
 }
 
@@ -1285,7 +1290,7 @@ function viewTeacher() {
       '<p class="body">' + T('Answer keys, class summary and the print pack. Enter the four-digit code.', '答案、班級摘要與印刷包。請輸入四位數字。') + '</p>' +
       '<div class="pin"><input type="password" inputmode="numeric" maxlength="4" id="pincode" aria-label="' + T('Four-digit code', '四位數字') + '">' +
       '<button class="btn" data-act="unlock">' + T('Open', '開啟') + '</button></div>' +
-      '<p class="tiny muted" style="margin-top:14px">' + T('Default code 2065 — change it in app.js before the lesson.', '預設 2065 —— 上課前請在 app.js 更改。') + '</p></div></div></section>';
+      '</div></div></section>';        /* v4.1: the code is no longer printed on this screen */
   }
 
   var itemKey = D.items.map(function (it) {

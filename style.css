@@ -243,6 +243,7 @@ body.motion .netviz .hotpath{animation:path 4.6s var(--ease) infinite}
 .pad{padding:26px 28px}
 .stack>*+*{margin-top:18px}
 .rowline{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.padletrow{margin:18px 0 4px}
 .grow{flex:1 1 auto}
 .muted{color:var(--muted)}
 .small{font-size:15px}
