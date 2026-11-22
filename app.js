@@ -856,8 +856,12 @@ function firstUnlocked() {
   for (var i = 0; i < o.length; i++) if (!qState(o[i]).locked) return i;
   return o.length;
 }
-function quizScore() {
-  var s = 0; quizOrder().forEach(function (st) { if (qState(st).ok) s++; }); return s;
+function quizScore(kind) {
+  var score = 0;
+  quizOrder().forEach(function (step) {
+    if ((!kind || step.kind === kind) && qState(step).ok) score++;
+  });
+  return score;
 }
 
 function viewQuiz() {
@@ -1240,11 +1244,12 @@ function viewHomework() {
 }
 
 /* ------------------------------------------------------------------ results */
-/* v4: one card with the three scores and the two written answers. Students type their
+/* One card with the quiz subtotals, other part scores and two written answers. Students type their
    class number, take a screenshot and post it on the class Padlet. Nothing is sent anywhere. */
 function viewResults() {
   var x = ST.tina, rows = [
-    [T('Part 1 · Quiz', '第 1 部分 · 測驗'), quizScore(), quizOrder().length],
+    [T('Part 1 · Questions 1–6 (types of malware)', '第 1 部分 · 第 1–6 題（惡意軟件類型）'), quizScore('item'), D.items.length],
+    [T('Part 1 · Questions 7–10 (Checkpoint)', '第 1 部分 · 第 7–10 題（檢查點）'), quizScore('cp'), D.checkpoint.length],
     [T('Part 2 · Match the routes', '第 2 部分 · 途徑配對'), ST.routesScore || 0, D.evidence.length],
     [T('Part 3 · Exit question', '第 3 部分 · 離堂小測'), x.score || 0, 3]
   ];
